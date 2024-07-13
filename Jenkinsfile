@@ -15,30 +15,63 @@ pipeline {
             }
         }
 
-        stage('Setup') {
+        stage('Setup Python Environment') {
             steps {
-                sh 'python3 -m venv venv'
-                sh '. venv/bin/activate'
-                sh 'pip install -r requirements.txt'
+                script {
+                    try {
+                        sh '''
+                            python3 -m venv venv
+                            . venv/bin/activate
+                            pip3 install --upgrade pip
+                            pip3 install -r requirements.txt
+                        '''
+                    } catch (Exception e) {
+                        error "Failed to set up Python environment: ${e.message}"
+                    }
+                }
             }
         }
 
         stage('Run Flask App') {
             steps {
-                sh 'python3 app/github_jenkins_webhook.py &'
+                script {
+                    try {
+                        sh '''
+                            . venv/bin/activate
+                            python3 github_jenkins_webhook.py &
+                            echo $! > .pidfile
+                        '''
+                    } catch (Exception e) {
+                        error "Failed to start Flask app: ${e.message}"
+                    }
+                }
             }
         }
 
         stage('Test') {
             steps {
-                sh 'curl http://localhost:5000/github-webhook/'
+                script {
+                    try {
+                        sh 'curl http://localhost:5000/github-webhook/'
+                    } catch (Exception e) {
+                        error "Test failed: ${e.message}"
+                    }
+                }
             }
         }
     }
 
     post {
         always {
-            sh 'pkill -f github_jenkins_webhook.py'
+            script {
+                if (fileExists('.pidfile')) {
+                    sh '''
+                        kill $(cat .pidfile) || true
+                        rm .pidfile
+                    '''
+                }
+            }
+            cleanWs()
         }
     }
 }
