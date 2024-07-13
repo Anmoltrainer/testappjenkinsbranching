@@ -48,6 +48,19 @@ pipeline {
             }
         }
 
+        stage('Trigger Jenkins Job') {
+            steps {
+                script {
+                    def response = httpRequest(
+                        url: "${env.JENKINS_URL}/job/${env.JENKINS_JOB}/build",
+                        authentication: 'jenkins-api-token',
+                        httpMode: 'POST'
+                    )
+                    echo "Response: ${response}"
+                }
+            }
+        }
+
         stage('Test') {
             steps {
                 script {
